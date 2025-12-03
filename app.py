@@ -95,7 +95,7 @@ if st.button("Procesar archivos") and archivos:
             "Poliza": poliza,
             "Cantidad_registros": len(df_sin_ultima),
             "Total_capital": total_capital_num if pd.notna(total_capital_num) else "no declara",
-            "Total_prima": total_prima_num if pd.notna(total_prima_num) else "no declara",
+            # "Total_prima": total_prima_num if pd.notna(total_prima_num) else "no declara",
             "Total_origen_col_H": sub_capital,
             "Total_origen_col_J": sub_prima
         })
