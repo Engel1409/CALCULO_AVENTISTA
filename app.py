@@ -7,7 +7,7 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 st.set_page_config(page_title="Validación de Documentos", layout="wide")
-st.title("📊 Validación de Documentos y Resumen de Archivos")
+st.title("📊 VALIDACION ADVENTISTAS📊)
 
 # Subir archivos
 archivos = st.file_uploader("Sube tus archivos Excel", type=["xlsx"], accept_multiple_files=True)
