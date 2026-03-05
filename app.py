@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import re
@@ -9,6 +8,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 st.set_page_config(page_title="Validación de Documentos", layout="wide")
 st.title("📊 VALIDACION ADVENTISTAS📊")
 
+# ------------------ Constantes fijas ------------------
+NETA = 0.00038
+V_D_E = 0.03
+V_IGV = 0.18
+
 # Subir archivos
 archivos = st.file_uploader("Sube tus archivos Excel", type=["xlsx"], accept_multiple_files=True)
 
@@ -16,6 +20,7 @@ archivos = st.file_uploader("Sube tus archivos Excel", type=["xlsx"], accept_mul
 if st.button("Procesar archivos") and archivos:
     no_validos = []
     resumen = []
+    calculos_por_registro = []  # detalle por fila de todos los archivos
 
     def validar_documento(row):
         tipo = str(row.get("Tipo de Documento", "")).strip().upper()
@@ -36,12 +41,18 @@ if st.button("Procesar archivos") and archivos:
             resumen.append({"Archivo": nombre_archivo, "Poliza": "no declara"})
             continue
 
+        # Asegurar columnas que usas luego
         for col in ["Tipo de Documento", "Número de Documento", "Capital Asegurado", "Prima"]:
             if col not in df.columns:
                 df[col] = pd.NA
 
+        # (Por si faltara en origen)
+        if "Nombre Completo" not in df.columns:
+            df["Nombre Completo"] = pd.NA
+
         df["validación documento"] = df.apply(validar_documento, axis=1)
 
+        # No válidos (No es DNI)
         df_no_validos = df[df["validación documento"] == "No es DNI"].copy()
         df_no_validos["archivo_origen"] = nombre_archivo
 
@@ -54,6 +65,7 @@ if st.button("Procesar archivos") and archivos:
                 df_no_validos[col] = pd.NA
         df_no_validos = df_no_validos[columnas_finales]
 
+        # Filtrar filas mínimas con nombre y número
         df_no_validos = df_no_validos[
             df_no_validos["Número de Documento"].notna() &
             df_no_validos["Número de Documento"].astype(str).str.strip().ne("") &
@@ -64,6 +76,7 @@ if st.button("Procesar archivos") and archivos:
         if not df_no_validos.empty:
             no_validos.append(df_no_validos)
 
+        # Detectar si la última fila es TOTAL
         ultima_es_subtotal = df.iloc[-1].astype(str).str.contains('TOTAL', case=False, na=False).any() if len(df) >= 1 else False
 
         if ultima_es_subtotal and len(df) > 1:
@@ -76,6 +89,7 @@ if st.button("Procesar archivos") and archivos:
             sub_capital = "no declara"
             sub_prima = "no declara"
 
+        # ---------- Tus totales existentes ----------
         total_capital_num = df_sin_ultima["Capital Asegurado"].sum(min_count=1) if pd.api.types.is_numeric_dtype(df_sin_ultima["Capital Asegurado"]) else pd.NA
         s = (df_sin_ultima["Prima"].astype(str)
                             .str.replace('\u00A0', '', regex=False)
@@ -87,9 +101,35 @@ if st.button("Procesar archivos") and archivos:
                             .str.replace(',', '.', regex=False))
         total_prima_num = pd.to_numeric(s, errors="coerce").sum(min_count=1)
 
+        # ---------- NUEVO: Cálculos por registro ----------
+        # Capital por registro (convertido a numérico)
+        capital_num = pd.to_numeric(df_sin_ultima["Capital Asegurado"], errors="coerce")
+
+        prima_neta_reg = capital_num * NETA
+        d_e_reg = prima_neta_reg * V_D_E
+        igv_reg = (prima_neta_reg + d_e_reg) * V_IGV
+        total_reg = prima_neta_reg + d_e_reg + igv_reg
+
+        # Construir dataframe de detalle por registro (con columnas útiles)
+        df_calc = df_sin_ultima.copy()
+        df_calc["prima_neta"] = prima_neta_reg
+        df_calc["D_E"] = d_e_reg
+        df_calc["IGV"] = igv_reg
+        df_calc["TOTAL"] = total_reg
+        df_calc["archivo_origen"] = nombre_archivo
+        calculos_por_registro.append(df_calc)
+
+        # Sumas por archivo para el resumen
+        suma_prima_neta = prima_neta_reg.sum(min_count=1)
+        suma_d_e = d_e_reg.sum(min_count=1)
+        suma_igv = igv_reg.sum(min_count=1)
+        suma_total = total_reg.sum(min_count=1)
+
+        # Extraer póliza del nombre (10+ dígitos)
         match = re.search(r'\d{10,}', nombre_archivo)
         poliza = match.group(0) if match else "no declara"
 
+        # ---------- Armar el resumen ----------
         resumen.append({
             "Archivo": nombre_archivo,
             "Poliza": poliza,
@@ -97,11 +137,27 @@ if st.button("Procesar archivos") and archivos:
             "Total_capital": total_capital_num if pd.notna(total_capital_num) else "no declara",
             # "Total_prima": total_prima_num if pd.notna(total_prima_num) else "no declara",
             "Total_origen_col_H": sub_capital,
-            "Total_origen_col_J": sub_prima
+            "Total_origen_col_J": sub_prima,
+
+            # Nuevas columnas inmediatamente después de Total_origen_col_J
+            "Suma_prima_neta": float(suma_prima_neta) if pd.notna(suma_prima_neta) else "no declara",
+            "Suma_D_E": float(suma_d_e) if pd.notna(suma_d_e) else "no declara",
+            "Suma_IGV": float(suma_igv) if pd.notna(suma_igv) else "no declara",
+            "Suma_TOTAL": float(suma_total) if pd.notna(suma_total) else "no declara"
         })
 
     df_no_validos_final = pd.concat(no_validos, ignore_index=True) if no_validos else pd.DataFrame()
     df_resumen = pd.DataFrame(resumen)
+
+    # Reordenar columnas del resumen para que queden justo después de Total_origen_col_J
+    orden_cols = [
+        "Archivo", "Poliza", "Cantidad_registros", "Total_capital",
+        # "Total_prima",  # si decides reactivarla, ubícala aquí
+        "Total_origen_col_H", "Total_origen_col_J",
+        "Suma_prima_neta", "Suma_D_E", "Suma_IGV", "Suma_TOTAL"
+    ]
+    # Mantener solo las presentes
+    df_resumen = df_resumen.reindex(columns=[c for c in orden_cols if c in df_resumen.columns])
 
     # ✅ Vista previa
     st.subheader("Vista previa de datos")
@@ -113,11 +169,30 @@ if st.button("Procesar archivos") and archivos:
     # Exportar a Excel en memoria
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # Hoja No válidos
         if df_no_validos_final.empty:
             pd.DataFrame({"mensaje": ["no declara"]}).to_excel(writer, sheet_name="No válidos", index=False)
         else:
             df_no_validos_final.to_excel(writer, sheet_name="No válidos", index=False)
+
+        # Hoja Resumen
         df_resumen.to_excel(writer, sheet_name="Totales por archivo", index=False)
+
+        # Hoja Cálculos por registro (detalle)
+        if calculos_por_registro:
+            df_calc_final = pd.concat(calculos_por_registro, ignore_index=True)
+            # Columnas compactas útiles
+            cols_calc = [c for c in df_calc_final.columns if c in [
+                "archivo_origen", "fila_en_excel",
+                "Tipo de Documento", "Número de Documento", "Nombre Completo",
+                "Capital Asegurado", "Prima",
+                "prima_neta", "D_E", "IGV", "TOTAL"
+            ]]
+            if cols_calc:
+                df_calc_final = df_calc_final[cols_calc]
+            df_calc_final.to_excel(writer, sheet_name="Cálculos por registro", index=False)
+        else:
+            pd.DataFrame({"mensaje": ["no declara"]}).to_excel(writer, sheet_name="Cálculos por registro", index=False)
 
     st.success("✅ Proceso completado.")
     st.download_button(
