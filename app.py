@@ -20,7 +20,6 @@ archivos = st.file_uploader("Sube tus archivos Excel", type=["xlsx"], accept_mul
 if st.button("Procesar archivos") and archivos:
     no_validos = []
     resumen = []
-    calculos_por_registro = []  # detalle por fila de todos los archivos
 
     def validar_documento(row):
         tipo = str(row.get("Tipo de Documento", "")).strip().upper()
@@ -101,8 +100,7 @@ if st.button("Procesar archivos") and archivos:
                             .str.replace(',', '.', regex=False))
         total_prima_num = pd.to_numeric(s, errors="coerce").sum(min_count=1)
 
-        # ---------- NUEVO: Cálculos por registro ----------
-        # Capital por registro (convertido a numérico)
+        # ---------- NUEVO: Cálculos por registro (solo para sumar; no se exporta hoja de detalle) ----------
         capital_num = pd.to_numeric(df_sin_ultima["Capital Asegurado"], errors="coerce")
 
         prima_neta_reg = capital_num * NETA
@@ -110,20 +108,20 @@ if st.button("Procesar archivos") and archivos:
         igv_reg = (prima_neta_reg + d_e_reg) * V_IGV
         total_reg = prima_neta_reg + d_e_reg + igv_reg
 
-        # Construir dataframe de detalle por registro (con columnas útiles)
-        df_calc = df_sin_ultima.copy()
-        df_calc["prima_neta"] = prima_neta_reg
-        df_calc["D_E"] = d_e_reg
-        df_calc["IGV"] = igv_reg
-        df_calc["TOTAL"] = total_reg
-        df_calc["archivo_origen"] = nombre_archivo
-        calculos_por_registro.append(df_calc)
-
-        # Sumas por archivo para el resumen
+        # Sumas por archivo
         suma_prima_neta = prima_neta_reg.sum(min_count=1)
         suma_d_e = d_e_reg.sum(min_count=1)
         suma_igv = igv_reg.sum(min_count=1)
         suma_total = total_reg.sum(min_count=1)
+
+        # Redondeo a 2 decimales (si no son NaN)
+        def redondear2(x):
+            return float(round(x, 2)) if pd.notna(x) else "no declara"
+
+        suma_prima_neta = redondear2(suma_prima_neta)
+        suma_d_e = redondear2(suma_d_e)
+        suma_igv = redondear2(suma_igv)
+        suma_total = redondear2(suma_total)
 
         # Extraer póliza del nombre (10+ dígitos)
         match = re.search(r'\d{10,}', nombre_archivo)
@@ -139,11 +137,11 @@ if st.button("Procesar archivos") and archivos:
             "Total_origen_col_H": sub_capital,
             "Total_origen_col_J": sub_prima,
 
-            # Nuevas columnas inmediatamente después de Total_origen_col_J
-            "Suma_prima_neta": float(suma_prima_neta) if pd.notna(suma_prima_neta) else "no declara",
-            "Suma_D_E": float(suma_d_e) if pd.notna(suma_d_e) else "no declara",
-            "Suma_IGV": float(suma_igv) if pd.notna(suma_igv) else "no declara",
-            "Suma_TOTAL": float(suma_total) if pd.notna(suma_total) else "no declara"
+            # Nuevas columnas inmediatamente después de Total_origen_col_J (redondeadas a 2)
+            "Suma_prima_neta": suma_prima_neta,
+            "Suma_D_E": suma_d_e,
+            "Suma_IGV": suma_igv,
+            "Suma_TOTAL": suma_total
         })
 
     df_no_validos_final = pd.concat(no_validos, ignore_index=True) if no_validos else pd.DataFrame()
@@ -156,7 +154,6 @@ if st.button("Procesar archivos") and archivos:
         "Total_origen_col_H", "Total_origen_col_J",
         "Suma_prima_neta", "Suma_D_E", "Suma_IGV", "Suma_TOTAL"
     ]
-    # Mantener solo las presentes
     df_resumen = df_resumen.reindex(columns=[c for c in orden_cols if c in df_resumen.columns])
 
     # ✅ Vista previa
@@ -166,7 +163,7 @@ if st.button("Procesar archivos") and archivos:
     st.write("**Totales por archivo:**")
     st.dataframe(df_resumen)
 
-    # Exportar a Excel en memoria
+    # Exportar a Excel en memoria (sin hoja de detalle)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         # Hoja No válidos
@@ -177,22 +174,6 @@ if st.button("Procesar archivos") and archivos:
 
         # Hoja Resumen
         df_resumen.to_excel(writer, sheet_name="Totales por archivo", index=False)
-
-        # Hoja Cálculos por registro (detalle)
-        if calculos_por_registro:
-            df_calc_final = pd.concat(calculos_por_registro, ignore_index=True)
-            # Columnas compactas útiles
-            cols_calc = [c for c in df_calc_final.columns if c in [
-                "archivo_origen", "fila_en_excel",
-                "Tipo de Documento", "Número de Documento", "Nombre Completo",
-                "Capital Asegurado", "Prima",
-                "prima_neta", "D_E", "IGV", "TOTAL"
-            ]]
-            if cols_calc:
-                df_calc_final = df_calc_final[cols_calc]
-            df_calc_final.to_excel(writer, sheet_name="Cálculos por registro", index=False)
-        else:
-            pd.DataFrame({"mensaje": ["no declara"]}).to_excel(writer, sheet_name="Cálculos por registro", index=False)
 
     st.success("✅ Proceso completado.")
     st.download_button(
