@@ -30,7 +30,7 @@ if st.button("Procesar archivos") and archivos:
 
     for archivo in archivos:
         nombre_archivo = archivo.name
-        st.write(f"Procesando: {nombre_archivo}...")
+        # st.write(f"Procesando: {nombre_archivo}...") NO MORSTRAR EN PANTALLA
         df = pd.read_excel(archivo, dtype={"Número de Documento": str})
         df.columns = df.columns.str.strip()
         df = df.dropna(how="all")
