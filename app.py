@@ -131,17 +131,17 @@ if st.button("Procesar archivos") and archivos:
         resumen.append({
             "Archivo": nombre_archivo,
             "Poliza": poliza,
-            "Cantidad_registros": len(df_sin_ultima),
-            "Total_capital": total_capital_num if pd.notna(total_capital_num) else "no declara",
+            "Cantidad_asegurados": len(df_sin_ultima),
+            "Suma_asegurada": total_capital_num if pd.notna(total_capital_num) else "no declara",
             # "Total_prima": total_prima_num if pd.notna(total_prima_num) else "no declara",
             "Total_origen_col_H": sub_capital,
             "Total_origen_col_J": sub_prima,
 
             # Nuevas columnas inmediatamente después de Total_origen_col_J (redondeadas a 2)
-            "Suma_prima_neta": suma_prima_neta,
-            "Suma_D_E": suma_d_e,
-            "Suma_IGV": suma_igv,
-            "Suma_TOTAL": suma_total
+            "prima_neta": suma_prima_neta,
+            "D_E": suma_d_e,
+            "IGV": suma_igv,
+            "Total": suma_total
         })
 
     df_no_validos_final = pd.concat(no_validos, ignore_index=True) if no_validos else pd.DataFrame()
@@ -149,10 +149,10 @@ if st.button("Procesar archivos") and archivos:
 
     # Reordenar columnas del resumen para que queden justo después de Total_origen_col_J
     orden_cols = [
-        "Archivo", "Poliza", "Cantidad_registros", "Total_capital",
+        "Archivo", "Poliza", "Cantidad_asegurados", "Suma_asegurada",
         # "Total_prima",  # si decides reactivarla, ubícala aquí
         "Total_origen_col_H", "Total_origen_col_J",
-        "Suma_prima_neta", "Suma_D_E", "Suma_IGV", "Suma_TOTAL"
+        "prima_neta", "D_E", "IGV", "Total"
     ]
     df_resumen = df_resumen.reindex(columns=[c for c in orden_cols if c in df_resumen.columns])
 
