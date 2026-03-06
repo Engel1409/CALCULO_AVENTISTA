@@ -8,8 +8,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 st.set_page_config(page_title="Validación de Documentos", layout="wide")
 st.title("📊 VALIDACION ADVENTISTAS📊")
 
-# ------------------ Constantes fijas ------------------
-NETA = 0.00038
+# ------------------ Selector de zona (afecta NETA) ------------------
+zona = st.selectbox("Selecciona la zona", options=["Sur", "Norte"], index=0)
+NETA = 0.00038 if zona == "Sur" else 0.00036   # Sur -> 0.00038, Norte -> 0.00036
+
+# Constantes fijas que no cambian por zona
 V_D_E = 0.03
 V_IGV = 0.18
 
@@ -30,7 +33,8 @@ if st.button("Procesar archivos") and archivos:
 
     for archivo in archivos:
         nombre_archivo = archivo.name
-        # st.write(f"Procesando: {nombre_archivo}...") NO MORSTRAR EN PANTALLA
+        # (Se eliminó el st.write de "Procesando...")
+
         df = pd.read_excel(archivo, dtype={"Número de Documento": str})
         df.columns = df.columns.str.strip()
         df = df.dropna(how="all")
@@ -40,12 +44,11 @@ if st.button("Procesar archivos") and archivos:
             resumen.append({"Archivo": nombre_archivo, "Poliza": "no declara"})
             continue
 
-        # Asegurar columnas que usas luego
+        # Asegurar columnas que se usan
         for col in ["Tipo de Documento", "Número de Documento", "Capital Asegurado", "Prima"]:
             if col not in df.columns:
                 df[col] = pd.NA
 
-        # (Por si faltara en origen)
         if "Nombre Completo" not in df.columns:
             df["Nombre Completo"] = pd.NA
 
@@ -88,7 +91,7 @@ if st.button("Procesar archivos") and archivos:
             sub_capital = "no declara"
             sub_prima = "no declara"
 
-        # ---------- Tus totales existentes ----------
+        # ---------- Totales existentes ----------
         total_capital_num = df_sin_ultima["Capital Asegurado"].sum(min_count=1) if pd.api.types.is_numeric_dtype(df_sin_ultima["Capital Asegurado"]) else pd.NA
         s = (df_sin_ultima["Prima"].astype(str)
                             .str.replace('\u00A0', '', regex=False)
@@ -100,7 +103,7 @@ if st.button("Procesar archivos") and archivos:
                             .str.replace(',', '.', regex=False))
         total_prima_num = pd.to_numeric(s, errors="coerce").sum(min_count=1)
 
-        # ---------- NUEVO: Cálculos por registro (solo para sumar; no se exporta hoja de detalle) ----------
+        # ---------- Cálculos por registro (para sumar en resumen) ----------
         capital_num = pd.to_numeric(df_sin_ultima["Capital Asegurado"], errors="coerce")
 
         prima_neta_reg = capital_num * NETA
@@ -131,17 +134,17 @@ if st.button("Procesar archivos") and archivos:
         resumen.append({
             "Archivo": nombre_archivo,
             "Poliza": poliza,
-            "Cantidad_asegurados": len(df_sin_ultima),
-            "Suma_asegurada": total_capital_num if pd.notna(total_capital_num) else "no declara",
+            "Cantidad_registros": len(df_sin_ultima),
+            "Total_capital": total_capital_num if pd.notna(total_capital_num) else "no declara",
             # "Total_prima": total_prima_num if pd.notna(total_prima_num) else "no declara",
             "Total_origen_col_H": sub_capital,
             "Total_origen_col_J": sub_prima,
 
             # Nuevas columnas inmediatamente después de Total_origen_col_J (redondeadas a 2)
-            "prima_neta": suma_prima_neta,
-            "D_E": suma_d_e,
-            "IGV": suma_igv,
-            "Total": suma_total
+            "Suma_prima_neta": suma_prima_neta,
+            "Suma_D_E": suma_d_e,
+            "Suma_IGV": suma_igv,
+            "Suma_TOTAL": suma_total
         })
 
     df_no_validos_final = pd.concat(no_validos, ignore_index=True) if no_validos else pd.DataFrame()
@@ -149,10 +152,10 @@ if st.button("Procesar archivos") and archivos:
 
     # Reordenar columnas del resumen para que queden justo después de Total_origen_col_J
     orden_cols = [
-        "Archivo", "Poliza", "Cantidad_asegurados", "Suma_asegurada",
+        "Archivo", "Poliza", "Cantidad_registros", "Total_capital",
         # "Total_prima",  # si decides reactivarla, ubícala aquí
         "Total_origen_col_H", "Total_origen_col_J",
-        "prima_neta", "D_E", "IGV", "Total"
+        "Suma_prima_neta", "Suma_D_E", "Suma_IGV", "Suma_TOTAL"
     ]
     df_resumen = df_resumen.reindex(columns=[c for c in orden_cols if c in df_resumen.columns])
 
