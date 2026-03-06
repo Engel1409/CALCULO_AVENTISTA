@@ -171,24 +171,34 @@ if st.button("Procesar archivos") and archivos:
     st.dataframe(df_resumen)
 
     # Exportar a Excel
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    # Exportar a Excel
+output = io.BytesIO()
+with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-        # --- No válidos ---
-        df_no_validos_final.to_excel(writer, sheet_name="No válidos", index=False)
+    # --- PRIMERO: Totales por archivo ---
+    df_resumen.to_excel(writer, sheet_name="Totales por archivo", index=False)
 
-        # --- Resumen ---
-        df_resumen.to_excel(writer, sheet_name="Totales por archivo", index=False)
+    # --- SEGUNDO: No válidos ---
+    df_no_validos_final.to_excel(writer, sheet_name="No válidos", index=False)
 
-        # ----------- COLOR A LAS CABECERAS -----------
-        wb = writer.book
-        ws = wb["Totales por archivo"]
+    # ----------- COLOR A LAS CABECERAS -----------
+    from openpyxl.styles import PatternFill, Font
 
-        fill = PatternFill(start_color="D53032", end_color="D53032", fill_type="solid")
+    wb = writer.book
 
+    # Color rojo y letra blanca
+    fill = PatternFill(start_color="D53032", end_color="D53032", fill_type="solid")
+    font_white = Font(color="FFFFFF", bold=True)
+
+    # Hojas a colorear
+    hojas = ["Totales por archivo", "No válidos"]
+
+    for hoja in hojas:
+        ws = wb[hoja]
         for cell in ws[1]:
-            cell.fill = fill
-
+            cell.fill = fill       # Fondo rojo
+            cell.font = font_white # Letras blancas
+    ``
     # Descargar
     st.success("✅ Proceso completado.")
     st.download_button(
