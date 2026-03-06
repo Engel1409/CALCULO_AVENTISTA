@@ -4,20 +4,20 @@ import re
 import io
 import warnings
 from datetime import datetime
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, Font
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 st.set_page_config(page_title="Validación de Documentos", layout="wide")
 st.title("📊 VALIDACION ADVENTISTAS📊")
 
-# ------------------ Zona (afecta NETA) ------------------
+# ------------------ Selector de zona (afecta NETA) ------------------
 zona = st.selectbox("Selecciona la zona", options=["Sur", "Norte"], index=0)
 NETA = 0.00038 if zona == "Sur" else 0.00036
 V_D_E = 0.03
 V_IGV = 0.18
 
 # ------------------ Lista de usuarios ------------------
-usuarios = ["Engel Garcia", "Sophia Burkli ", "Otros"]  
+usuarios = ["Engel", "Carlos", "Rosa", "Claudia", "Administrador"]
 usuario_seleccionado = st.selectbox("Selecciona tu usuario:", usuarios)
 
 # Fecha del reporte
@@ -52,17 +52,17 @@ if st.button("Procesar archivos") and archivos:
             resumen.append({"Archivo": nombre_archivo, "Poliza": "no declara"})
             continue
 
-        # Asegurar columnas base
+        # Asegurar columnas obligatorias
         for col in ["Tipo de Documento", "Número de Documento", "Capital Asegurado", "Prima"]:
             if col not in df.columns:
                 df[col] = pd.NA
-
         if "Nombre Completo" not in df.columns:
             df["Nombre Completo"] = pd.NA
 
+        # Validación DNI
         df["validación documento"] = df.apply(validar_documento, axis=1)
 
-        # No válidos
+        # Filtrar no válidos
         df_no_validos = df[df["validación documento"] == "No es DNI"].copy()
         df_no_validos["archivo_origen"] = nombre_archivo
 
@@ -70,11 +70,9 @@ if st.button("Procesar archivos") and archivos:
             "Tipo de Documento", "Número de Documento", "Nombre Completo",
             "validación documento", "archivo_origen", "fila_en_excel"
         ]
-
         for col in columnas_finales:
             if col not in df_no_validos.columns:
                 df_no_validos[col] = pd.NA
-
         df_no_validos = df_no_validos[columnas_finales]
 
         df_no_validos = df_no_validos[
@@ -87,10 +85,10 @@ if st.button("Procesar archivos") and archivos:
         if not df_no_validos.empty:
             no_validos.append(df_no_validos)
 
-        # Detectar TOTAL
-        ultima_es_subtotal = df.iloc[-1].astype(str).str.contains('TOTAL', case=False, na=False).any()
+        # Detectar si última fila es TOTAL
+        ultima_es_subtotal = df.iloc[-1].astype(str).str.contains("TOTAL", case=False, na=False).any()
 
-        if ultima_es_subtotal:
+        if ultima_es_subtotal and len(df) > 1:
             ultima_fila = df.iloc[-1]
             df_sin_ultima = df.iloc[:-1].copy()
             sub_capital = ultima_fila.get("Capital Asegurado", "no declara")
@@ -100,10 +98,9 @@ if st.button("Procesar archivos") and archivos:
             sub_capital = "no declara"
             sub_prima = "no declara"
 
-        # Total capital
+        # Totales existentes
         total_capital_num = df_sin_ultima["Capital Asegurado"].sum(min_count=1)
 
-        # Prima limpieza
         s = (df_sin_ultima["Prima"].astype(str)
              .str.replace('\u00A0', '', regex=False)
              .str.replace('\u202F', '', regex=False)
@@ -112,6 +109,7 @@ if st.button("Procesar archivos") and archivos:
              .str.replace('s/', '', regex=False)
              .str.replace('.', '', regex=False)
              .str.replace(',', '.', regex=False))
+
         total_prima_num = pd.to_numeric(s, errors="coerce").sum(min_count=1)
 
         # ---------- Cálculos ----------
@@ -130,7 +128,7 @@ if st.button("Procesar archivos") and archivos:
         suma_igv = red2(igv_reg.sum(min_count=1))
         suma_total = red2(total_reg.sum(min_count=1))
 
-        # Detectar póliza
+        # Extraer póliza
         match = re.search(r'\d{10,}', nombre_archivo)
         poliza = match.group(0) if match else "no declara"
 
@@ -154,7 +152,7 @@ if st.button("Procesar archivos") and archivos:
     df_no_validos_final = pd.concat(no_validos, ignore_index=True) if no_validos else pd.DataFrame()
     df_resumen = pd.DataFrame(resumen)
 
-    # Orden final del resumen
+    # Orden columnas
     orden_cols = [
         "Archivo", "Poliza", "Usuario", "Zona", "Fecha_reporte",
         "Cantidad_registros", "Total_capital",
@@ -165,41 +163,34 @@ if st.button("Procesar archivos") and archivos:
 
     # Vista previa
     st.subheader("Vista previa de datos")
-    st.write("**No válidos:**")
-    st.dataframe(df_no_validos_final)
     st.write("**Totales por archivo:**")
     st.dataframe(df_resumen)
+    st.write("**No válidos:**")
+    st.dataframe(df_no_validos_final)
 
     # Exportar a Excel
-    # Exportar a Excel
-output = io.BytesIO()
-with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-    # --- PRIMERO: Totales por archivo ---
-    df_resumen.to_excel(writer, sheet_name="Totales por archivo", index=False)
+        # PRIMERO: Totales por archivo
+        df_resumen.to_excel(writer, sheet_name="Totales por archivo", index=False)
 
-    # --- SEGUNDO: No válidos ---
-    df_no_validos_final.to_excel(writer, sheet_name="No válidos", index=False)
+        # SEGUNDO: No válidos
+        df_no_validos_final.to_excel(writer, sheet_name="No válidos", index=False)
 
-    # ----------- COLOR A LAS CABECERAS -----------
-    from openpyxl.styles import PatternFill, Font
+        # ----------- COLOR A LAS CABECERAS -----------
+        wb = writer.book
+        fill = PatternFill(start_color="D53032", end_color="D53032", fill_type="solid")
+        font_white = Font(color="FFFFFF", bold=True)
 
-    wb = writer.book
+        hojas = ["Totales por archivo", "No válidos"]
 
-    # Color rojo y letra blanca
-    fill = PatternFill(start_color="D53032", end_color="D53032", fill_type="solid")
-    font_white = Font(color="FFFFFF", bold=True)
+        for hoja in hojas:
+            ws = wb[hoja]
+            for cell in ws[1]:
+                cell.fill = fill
+                cell.font = font_white
 
-    # Hojas a colorear
-    hojas = ["Totales por archivo", "No válidos"]
-
-    for hoja in hojas:
-        ws = wb[hoja]
-        for cell in ws[1]:
-            cell.fill = fill       # Fondo rojo
-            cell.font = font_white # Letras blancas
-    ``
-    # Descargar
     st.success("✅ Proceso completado.")
     st.download_button(
         label="📥 Descargar reporte final",
