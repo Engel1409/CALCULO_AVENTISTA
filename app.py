@@ -17,7 +17,7 @@ V_D_E = 0.03
 V_IGV = 0.18
 
 # ------------------ Lista de usuarios ------------------
-usuarios = ["Engel", "Carlos", "Rosa", "Claudia", "Administrador"]
+usuarios = ["Engel Garcia", "Sophia Burkli", "User_01", "User_02"]
 usuario_seleccionado = st.selectbox("Selecciona tu usuario:", usuarios)
 
 # Fecha del reporte
@@ -143,10 +143,10 @@ if st.button("Procesar archivos") and archivos:
             "Total_capital": total_capital_num,
             "Total_origen_col_H": sub_capital,
             "Total_origen_col_J": sub_prima,
-            "Suma_prima_neta": suma_prima_neta,
-            "Suma_D_E": suma_d_e,
-            "Suma_IGV": suma_igv,
-            "Suma_TOTAL": suma_total
+            "prima_neta": suma_prima_neta,
+            "D_E": suma_d_e,
+            "IGV": suma_igv,
+            "TOTAL": suma_total
         })
 
     df_no_validos_final = pd.concat(no_validos, ignore_index=True) if no_validos else pd.DataFrame()
@@ -157,7 +157,7 @@ if st.button("Procesar archivos") and archivos:
         "Archivo", "Poliza", "Usuario", "Zona", "Fecha_reporte",
         "Cantidad_registros", "Total_capital",
         "Total_origen_col_H", "Total_origen_col_J",
-        "Suma_prima_neta", "Suma_D_E", "Suma_IGV", "Suma_TOTAL"
+        "prima_neta", "D_E", "IGV", "TOTAL"
     ]
     df_resumen = df_resumen[orden_cols]
 
