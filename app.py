@@ -8,16 +8,18 @@ from openpyxl.styles import PatternFill, Font
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 st.set_page_config(page_title="Validación de Documentos", layout="wide")
-st.title("📊 VALIDACION ADVENTISTAS📊")
+st.title("📊 Validación y Cálculo de Primas -  Seguros📊")
 
 # ------------------ Selector de zona (afecta NETA) ------------------
+# Las tasas son referenciales y configulables segun la aseguradora
+
 zona = st.selectbox("Selecciona la zona", options=["Sur", "Norte"], index=0)
 NETA = 0.00038 if zona == "Sur" else 0.00036
 V_D_E = 0.03
 V_IGV = 0.18
 
 # ------------------ Lista de usuarios ------------------
-usuarios = ["Engel Garcia", "Sophia Burkli", "User_01", "User_02"]
+usuarios = ["Sofi B", "Engel B", "User_01", "User_02"]
 usuario_seleccionado = st.selectbox("Selecciona tu usuario:", usuarios)
 
 # Fecha del reporte
