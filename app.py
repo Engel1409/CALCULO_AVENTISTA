@@ -8,7 +8,7 @@ from openpyxl.styles import PatternFill, Font
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
 st.set_page_config(page_title="Validación de Documentos", layout="wide")
-st.title("📊 Validación y Cálculo de Primas -  Seguros📊")
+st.title("Validación y Cálculo de Primas -  Seguros")
 
 # ------------------ Selector de zona (afecta NETA) ------------------
 # Las tasas son referenciales y configulables segun la aseguradora
