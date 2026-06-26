@@ -1,4 +1,13 @@
-
+---
+title: POLIDATA
+emoji: 📄
+colorFrom: blue
+colorTo: red
+sdk: streamlit
+sdk_version: 1.30.0
+app_file: app.py
+pinned: false
+---
 # Validación de Documentos
 Aplicación en Streamlit para validar documentos en archivos Excel y generar un resumen descargable.
 
