@@ -1,0 +1,16 @@
+name: Sync to Hugging Face Space
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push to hub
+        uses: huggingface/hub-sync@main
+        with:
+          huggingface_repo_id: "Data-engel/datos-pdf-excel"
+          hf_token: ${{ secrets.HF_TOKEN }}
