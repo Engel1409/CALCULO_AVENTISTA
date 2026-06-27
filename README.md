@@ -1,5 +1,5 @@
 ---
-title: POLIDATA
+title: cálculo de primas 
 emoji: 📄
 colorFrom: blue
 colorTo: red
